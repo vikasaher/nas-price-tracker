@@ -8,10 +8,16 @@ BOT_TOKEN = os.environ["BOT_TOKEN"]
 CHAT_ID = os.environ["CHAT_ID"]
 
 PRODUCT = {
-    "name": "Toshiba N300 Pro 14TB NAS HDD",
+    "name": "Toshiba N300 Pro 14TB NAS HDD (HDWG51EXZSTB)",
     "urls": [
+        # Walmart
         "https://www.walmart.com/ip/1424840852",
-        # You will later add Amazon + Newegg links here
+
+        # ADD AMAZON HERE (example format)
+        # "https://www.amazon.com/Western-Digital-14TB-Internal-Drive/dp/B0CD2XBZWR/ref=sr_1_4?crid=XT25DW915IRC&dib=eyJ2IjoiMSJ9.LCyBOohuZVlpbqpBHfgS91AQFs9-lD3x1RKb9Z-XUrJJZP0rE7Hg5I-CF_UoZ3TpSG8RHRplpn2BWDoXg2FHKX8H3Krm7oTVBRGaKfM31UMpc4MYDbvUSq-CKUUqinSteUr9LKlb2PsqIktArP-hshulI3XsMZrYGwKuDsv6aN5gPmR-E7olUdkGljW_Y7Wp-5xy2s42OrugG8vdwXJTsuP8-LglrSNh4445DRn5ejU.g5o1ppSs5mAkwzU7K0KA4Bi3YifQZvb35X0Bve97tKo&dib_tag=se&keywords=14+TB+NAS+HDD&qid=1779919770&sprefix=14+tb+nas+hdd%2Caps%2C194&sr=8-4",
+
+        # ADD NEWEGG HERE
+        # "https://www.newegg.com/toshiba-n300-pro-hdwg51exzstb-14tb/p/N82E16822149807"
     ]
 }
 
@@ -25,8 +31,6 @@ def send(msg):
     )
 
 
-# ---------- RELIABLE PRICE EXTRACTION ----------
-
 def extract_price(text):
     prices = re.findall(r"\$(\d+\.\d{2})", text)
     if not prices:
@@ -34,15 +38,11 @@ def extract_price(text):
     return min(float(p) for p in prices)
 
 
-def get_walmart_price(url):
-    headers = {
-        "User-Agent": "Mozilla/5.0",
-        "Accept-Language": "en-US,en;q=0.9"
-    }
-
+def get_price(url):
+    headers = {"User-Agent": "Mozilla/5.0"}
     r = requests.get(url, headers=headers, timeout=20)
 
-    # Walmart sometimes embeds JSON in page — this is more stable than raw scraping
+    # try structured extraction first
     soup = BeautifulSoup(r.text, "html.parser")
 
     scripts = soup.find_all("script")
@@ -56,18 +56,6 @@ def get_walmart_price(url):
     return extract_price(r.text)
 
 
-def get_price(url):
-    if "walmart.com" in url:
-        return get_walmart_price(url)
-
-    # generic fallback (Amazon / Newegg initial version)
-    headers = {"User-Agent": "Mozilla/5.0"}
-    r = requests.get(url, headers=headers, timeout=20)
-    return extract_price(r.text)
-
-
-# ---------- STATE ----------
-
 def load_state():
     if not os.path.exists(STATE_FILE):
         return {}
@@ -78,8 +66,6 @@ def save_state(state):
     json.dump(state, open(STATE_FILE, "w"), indent=2)
 
 
-# ---------- MAIN LOGIC ----------
-
 def main():
     state = load_state()
 
@@ -88,7 +74,6 @@ def main():
 
     for url in PRODUCT["urls"]:
         price = get_price(url)
-
         if price is None:
             continue
 
@@ -107,17 +92,15 @@ def main():
         save_state(state)
         return
 
-    # alert only on meaningful drop
     if best_price < last - 10:
         send(
-            f"🔻 PRICE DROP ALERT\n\n"
+            f"🔻 PRICE DROP\n\n"
             f"{PRODUCT['name']}\n"
             f"Old: ${last}\n"
             f"New: ${best_price}\n\n"
-            f"Best link:\n{best_url}"
+            f"{best_url}"
         )
         state[PRODUCT["name"]] = best_price
-
     else:
         state[PRODUCT["name"]] = last
 
