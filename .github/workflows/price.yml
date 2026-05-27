@@ -1,4 +1,4 @@
-name: Price Tracker
+name: NAS Price Tracker
 
 on:
   schedule:
